@@ -24,4 +24,4 @@ A full-stack car rental application with real-time booking, location-based disco
 - `client/` - React app built with Vite
 - `server/` - Express backend API
 
-- live preview- https://car-rental-gs.vercel.app/cars
+- live preview- ai-car-rental-ayfbqo481-aswins-projects-6653a706.vercel.app
