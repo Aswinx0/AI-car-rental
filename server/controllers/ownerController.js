@@ -3,6 +3,7 @@ import Booking from "../models/Booking.js";
 import Car from "../models/Car.js";
 import User from "../models/User.js";
 import fs from "fs";
+import { rebuildVectorStore } from "../chatbot.js";
 
 
 // API to Change Role of User
@@ -46,6 +47,9 @@ export const addCar = async (req, res)=>{
         const image = optimizedImageUrl;
         await Car.create({...car, owner: _id, image})
 
+        // Rebuild the chatbot vector index asynchronously (do not block response)
+        rebuildVectorStore().catch((err) => console.error('Rebuild vector store failed:', err?.message || err))
+
         res.json({success: true, message: "Car Added"})
 
     } catch (error) {
@@ -81,6 +85,9 @@ export const toggleCarAvailability = async (req, res) =>{
         car.isAvaliable = !car.isAvaliable;
         await car.save()
 
+        // Update vector index to reflect availability change
+        rebuildVectorStore().catch((err) => console.error('Rebuild vector store failed:', err?.message || err))
+
         res.json({success: true, message: "Availability Toggled"})
     } catch (error) {
         console.log(error.message);
@@ -104,6 +111,9 @@ export const deleteCar = async (req, res) =>{
         car.isAvaliable = false;
 
         await car.save()
+
+        // Rebuild index after removal
+        rebuildVectorStore().catch((err) => console.error('Rebuild vector store failed:', err?.message || err))
 
         res.json({success: true, message: "Car Removed"})
     } catch (error) {

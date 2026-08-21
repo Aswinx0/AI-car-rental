@@ -32,7 +32,12 @@ export const AppProvider = ({ children })=>{
             navigate('/')
            }
         } catch (error) {
-            toast.error(error.message)
+            // Only show a user-facing error for unexpected failures
+            if (error.response) {
+                console.error('fetchUser error', error.response.status, error.response.data)
+            } else {
+                toast.error(error.message)
+            }
         }
     }
     // Function to fetch all cars from the server
@@ -42,7 +47,12 @@ export const AppProvider = ({ children })=>{
             const {data} = await axios.get('/api/user/cars')
             data.success ? setCars(data.cars) : toast.error(data.message)
         } catch (error) {
-            toast.error(error.message)
+            // Avoid showing a toast for 404s on initial load; log for debugging
+            if (error.response) {
+                console.error('fetchCars error', error.response.status, error.response.data)
+            } else {
+                toast.error(error.message)
+            }
         }
     }
 
@@ -67,7 +77,7 @@ export const AppProvider = ({ children })=>{
     // useEffect to fetch user data when token is available
     useEffect(()=>{
         if(token){
-            axios.defaults.headers.common['Authorization'] = `${token}`
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
             fetchUser()
         }
     },[token])

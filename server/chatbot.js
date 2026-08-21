@@ -125,21 +125,53 @@ export async function askChatbot(question) {
     temperature: 0.3,
     apiKey: process.env.GROQ_API_KEY,
   });
-
-  const response = await llm.invoke([
-    new SystemMessage(
-      `You are a helpful car rental assistant for an Indian car rental platform.
+  try {
+    const response = await llm.invoke([
+      new SystemMessage(
+        `You are a helpful car rental assistant for an Indian car rental platform.
 Use ONLY the car data provided in the context to answer questions.
 If no suitable cars match, say so politely and suggest adjusting budget, passenger count, or location.
 Prices are in INR (₹). Be concise and recommend specific cars with brand, model, price per day, seating, and why they fit.`
-    ),
-    new HumanMessage(
-      `Context (available cars):\n${context}\n\nUser question: ${trimmedQuestion}`
-    ),
-  ]);
+      ),
+      new HumanMessage(
+        `Context (available cars):\n${context}\n\nUser question: ${trimmedQuestion}`
+      ),
+    ]);
 
-  return {
-    answer: response.content,
-    sources: relevantDocs.map((doc) => doc.metadata),
-  };
+    return {
+      answer: response.content,
+      sources: relevantDocs.map((doc) => doc.metadata),
+    };
+  } catch (err) {
+    // Log full error for debugging — external API errors often include useful details here
+    console.error('LLM invocation error:', err?.response || err);
+    // If the error indicates the model doesn't exist or access is denied, provide a safe fallback
+    const errCode = err?.response?.data?.error?.code || '';
+    const errMsg = err?.response?.data?.error?.message || err.message || '';
+    const modelNotFound = /model_not_found|does not exist|not found/i.test(errCode + ' ' + errMsg);
+
+    if (modelNotFound) {
+      console.warn('Configured GROQ model unavailable — returning fallback car suggestions');
+      if (relevantDocs && relevantDocs.length > 0) {
+        const top = relevantDocs.slice(0, 3);
+        const lines = top.map((doc, i) => {
+          const m = doc.metadata || {};
+          return `${i + 1}. ${m.brand || 'Unknown'} ${m.model || ''} — ₹${m.pricePerDay || 'N/A'}/day — seats ${m.seating_capacity || 'N/A'} — ${m.location || 'N/A'}`;
+        }).join('\n');
+
+        const fallbackAnswer = `The configured LLM model is unavailable. Meanwhile, here are the top matching cars from our data:\n\n${lines}`;
+        return {
+          answer: fallbackAnswer,
+          sources: relevantDocs.map((doc) => doc.metadata),
+        };
+      } else {
+        throw new Error('Chatbot LLM error: configured model unavailable and no cars found to form a fallback response.');
+      }
+    }
+
+    // For other errors, throw a clearer, actionable message to the caller
+    throw new Error(
+      `Chatbot LLM error: ${err.message || 'unknown error'}. Check GROQ_MODEL and GROQ_API_KEY and ensure the configured model is available to your account.`
+    );
+  }
 }
